@@ -2,31 +2,8 @@
 ;; To create a file, visit it with SPC . and enter text in its buffer.
 
 
-(bookmark-name-from-full-record (car (bookmark-maybe-sort-alist)))
-
-(--map 
- (substring-no-properties (bookmark-name-from-full-record it))
- (bookmark-maybe-sort-alist))
-
-(defun action(bookmark)
-  (bookmark--jump-via bookmark 'switch-to-buffer-other-window)
-  )
-(defun preview-action (action cand)
-  (let ((cur-buf(current-buffer)))
-	(progn
-	  (save-excursion
-		(ignore-errors
-		  (bookmark--jump-via cand 'switch-to-buffer-other-window)
-		)
-		(pop-to-buffer cur-buf '(display-buffer-in-previous-window . ()) t)
-		)
-	  )
-	)
-  )
-;; (funcall (or (bookmark-get-handler (bookmark-bmenu-bookmark))
-;;                    'bookmark-default-handler)
-;;                (bookmark-get-bookmark (bookmark-bmenu-bookmark)))
 (require 'consult)
+(require 'dash)
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
   )
@@ -81,7 +58,7 @@
 	  (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark))
 	  (comment-line 1)
 	  ;; [[**  (bookmark-jump "org link font lock")  **]]
-	  (previous-line)
+	  (forward-line -1)
 	  (set-text-properties
 	   (pos-bol) (pos-eol)
 	   '(
@@ -167,7 +144,7 @@
 		   face org-link
 		   ))
 		)
-	  (next-line)
+	  (forward-line)
 	  )
 	))
 (provide 'proglink)
