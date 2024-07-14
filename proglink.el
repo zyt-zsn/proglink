@@ -139,6 +139,8 @@
 	(define-key map (kbd "C-c C-l") #'zyt/prog-insert-link)
 	(define-key map (kbd "C-c C-o") #'zyt/prog-goto-link)
 	map))
+
+;;;###autoload
 (define-minor-mode zyt/prog-link-minor-mode
   "在编程模式下添加文档连接"
   :init-value nil
@@ -168,7 +170,7 @@
 	  (next-line)
 	  )
 	))
-(provide 'zyt/prog-link)
+(provide 'proglink)
 
 
 ;; [[**  (bookmark--jump-via "usb_20.pdf" 'switch-to-buffer-other-window)  **]]
