@@ -71,16 +71,21 @@
 	  (comment-line 1)
 	  ;; [[**  (bookmark-jump "org link font lock")  **]]
 	  (forward-line -1)
-	  (set-text-properties
-	   (pos-bol) (pos-eol)
-	   '(
-		 mouse-face highlight
-		 help-echo "mouse-2: visit this file in other window"
-		 font-lock-fontified nil
-		 ;; face org-document-title
-		 ;; face tdr-font-mode
-		 face org-link
-		 ))
+	  (let ((map (make-sparse-keymap)))
+		(define-key map [down-mouse-1] 'zyt/prog-goto-link)
+		(set-text-properties
+		 (pos-bol) (pos-eol)
+		 `(
+		   keymap ,map
+		   mouse-face highlight
+		   help-echo "mouse-2: visit this file in other window"
+		   font-lock-fontified nil
+		   ;; face org-document-title
+		   ;; face tdr-font-mode
+		   face org-link
+		   )
+		 )
+		)
 	  )
 	))
 ;; [[**  (bookmark--jump-via "SCSI_Peripheral_Device_Type" 'switch-to-buffer-other-window)  **]]
@@ -145,16 +150,22 @@
 		   (pos-eol)
 		   t
 		   )
-		(set-text-properties
-		 (pos-bol) (pos-eol)
-		 '(
-		   mouse-face highlight
-		   help-echo "mouse-2: visit this file in other window"
-		   font-lock-fontified nil
-		   ;; face org-document-title
-		   ;; face tdr-font-mode
-		   face org-link
-		   ))
+		
+		(let ((map (make-sparse-keymap)))
+		  (define-key map [down-mouse-1] 'zyt/prog-goto-link)
+		  (set-text-properties
+		   (pos-bol) (pos-eol)
+		   `(
+			 keymap ,map
+			 mouse-face highlight
+			 help-echo "mouse-2: visit this file in other window"
+			 font-lock-fontified nil
+			 ;; face org-document-title
+			 ;; face tdr-font-mode
+			 face org-link
+			 )
+		   )
+		  )
 		)
 	  (forward-line)
 	  )
