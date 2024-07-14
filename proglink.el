@@ -27,13 +27,16 @@
                    'bookmark-default-handler)
                (bookmark-get-bookmark (bookmark-bmenu-bookmark)))
 (require 'consult)
+(defconst zyt/prog-link-header-regexp
+  "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
+  )
 (defun zyt/prog-goto-link()
   (interactive)
   (save-excursion
 	(goto-char (pos-bol))
 	(when
 		(re-search-forward
-		 "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]" 
+		 zyt/prog-link-header-regexp
 		 (pos-eol)
 		 t
 		 )
@@ -93,7 +96,7 @@
 	))
 ;; [[**  (bookmark--jump-via "SCSI_Peripheral_Device_Type" 'switch-to-buffer-other-window)  **]]
 
-
+;; [[**  (bookmark--jump-via "usb_20.pdf" 'switch-to-buffer-other-window)  **]]
 
 
 
@@ -141,10 +144,31 @@
   :init-value nil
   :lighter " IL"
   :keymap zyt/prog-link-mode-map
-  )
+  (save-excursion
+	(goto-char (point-min))
+	(while (< (point) (point-max))
+	  (goto-char (pos-bol))
+	  (when
+		  (re-search-forward
+		   zyt/prog-link-header-regexp
+		   (pos-eol)
+		   t
+		   )
+		(set-text-properties
+		 (pos-bol) (pos-eol)
+		 '(
+		   mouse-face highlight
+		   help-echo "mouse-2: visit this file in other window"
+		   font-lock-fontified nil
+		   ;; face org-document-title
+		   ;; face tdr-font-mode
+		   face org-link
+		   ))
+		)
+	  (next-line)
+	  )
+	))
 (provide 'zyt/prog-link)
 
 
 ;; [[**  (bookmark--jump-via "usb_20.pdf" 'switch-to-buffer-other-window)  **]]
-
-
