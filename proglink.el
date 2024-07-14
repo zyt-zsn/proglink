@@ -23,9 +23,9 @@
 	  )
 	)
   )
-(funcall (or (bookmark-get-handler (bookmark-bmenu-bookmark))
-                   'bookmark-default-handler)
-               (bookmark-get-bookmark (bookmark-bmenu-bookmark)))
+;; (funcall (or (bookmark-get-handler (bookmark-bmenu-bookmark))
+;;                    'bookmark-default-handler)
+;;                (bookmark-get-bookmark (bookmark-bmenu-bookmark)))
 (require 'consult)
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
