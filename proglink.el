@@ -27,6 +27,20 @@
                    'bookmark-default-handler)
                (bookmark-get-bookmark (bookmark-bmenu-bookmark)))
 (require 'consult)
+(defun zyt/prog-goto-link()
+  (interactive)
+  (save-excursion
+	(goto-char (pos-bol))
+	(when
+		(re-search-forward
+		 "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]" 
+		 (pos-eol)
+		 t
+		 )
+	  (bookmark--jump-via (match-string 1) 'switch-to-buffer-other-window)
+	  )
+	)
+  )
 (defun zyt/prog-insert-link()
   (interactive)
   (let* ((cur-buff (current-buffer))
@@ -120,6 +134,7 @@
 (defvar zyt/prog-link-mode-map
   (let ((map (make-sparse-keymap)))
 	(define-key map (kbd "C-c C-l") #'zyt/prog-insert-link)
+	(define-key map (kbd "C-c C-o") #'zyt/prog-goto-link)
 	map))
 (define-minor-mode zyt/prog-link-minor-mode
   "在编程模式下添加文档连接"
