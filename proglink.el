@@ -4,6 +4,7 @@
 
 (require 'consult)
 (require 'dash)
+(require 'cc-mode)
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
   )
