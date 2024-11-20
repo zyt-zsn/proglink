@@ -3,6 +3,7 @@
 
 
 (require 'consult)
+(require 'ffap)
 (require 'dash)
 (require 'cc-mode)
 (defconst zyt/prog-link-header-regexp
@@ -109,11 +110,15 @@
 				:prompt "Insert link from buffer: "
 				:history 'consult--buffer-history
 				:sort nil))))
-	(prog1
-		(with-current-buffer (car selected)
-		  (string-replace "\n" "" (pp-to-string (bookmark-make-record)))
+	(if (get-buffer (car selected))
+		(prog1
+			(with-current-buffer (car selected)
+			  (string-replace "\n" "" (pp-to-string (bookmark-make-record)))
+			  )
+		  (pop-to-buffer cur-buf 'display-buffer-same-window)
 		  )
-	  (pop-to-buffer cur-buf 'display-buffer-same-window)
+	  (and (ffap-url-p (car selected))
+		   (car selected))
 	  )
 	)
   )
