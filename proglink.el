@@ -254,7 +254,8 @@
 		   (pos-eol)
 		   t
 		   )
-		(let ((map (make-sparse-keymap)))
+		(let ((map (make-sparse-keymap))
+			  (modified-flag (buffer-modified-p)))
 		  (define-key map [down-mouse-1] 'zyt/prog-goto-link)
 		  (set-text-properties
 		   (pos-bol) (pos-eol)
@@ -268,6 +269,7 @@
 			 face org-link
 			 )
 		   )
+		  (set-buffer-modified-p modified-flag)
 		  )
 		)
 	  (forward-line)
