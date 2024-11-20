@@ -66,7 +66,10 @@
 				 (null (eq buf (current-buffer)))
 				 ;; buffer should, either "Return the current buffer's file in a way useful for bookmarks." or provide customized ~bookmark-make-record-function~, to make ~bookmark-make-record~ success.
 				 (with-current-buffer buf
-				   (or (bookmark-buffer-file-name)
+				   (or (condition-case nil
+						   ;; bookmark-buffer-file-name throw error in some buffers such as *Info* buffer
+						   (bookmark-buffer-file-name)
+						 (error nil))
 					   (null (eq bookmark-make-record-function
 								 'bookmark-make-record-default
 								 ))))
