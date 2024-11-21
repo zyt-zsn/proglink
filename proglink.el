@@ -6,6 +6,7 @@
 (require 'ffap)
 (require 'dash)
 (require 'cc-mode)
+(require 'zyt-ffap-handler)
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
   )
@@ -287,3 +288,7 @@
 
 
 ;; [[**  (bookmark--jump-via "usb_20.pdf" 'switch-to-buffer-other-window)  **]]
+
+;; Local Variables:
+;; coding: chinese-gb18030-dos
+;; End:
