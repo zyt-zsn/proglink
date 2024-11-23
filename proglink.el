@@ -10,6 +10,7 @@
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
   )
+(defvar zyt/prog-link-face font-lock-doc-face)
 (defun zyt/prog-goto-link()
   (interactive)
   (save-excursion
@@ -23,8 +24,11 @@
 	  (let ((bookmark-str (match-string 1)))
 		(if (consp (car (read-from-string bookmark-str)))
 			(bookmark--jump-via (car (read-from-string bookmark-str)) 'switch-to-buffer-other-window)
-			;; (bookmark-jump (car (read-from-string bookmark-str)))
-		  (bookmark--jump-via bookmark-str 'switch-to-buffer-other-window)
+		  ;; (bookmark-jump (car (read-from-string bookmark-str)))
+		  (if (bookmark-get-bookmark bookmark-str t)
+			  (bookmark--jump-via bookmark-str 'switch-to-buffer-other-window)
+			(find-file-at-point bookmark-str)
+			)
 		  ;; (bookmark-jump bookmark-str)
 		  )
 		)
@@ -44,7 +48,8 @@
 (defun zyt/prog-store-link()
   "Create temporary link to insert into program-mode files"
   (interactive)
-  (setq zyt/prog-temp-link (string-replace "\n" "" (pp-to-string (bookmark-make-record))))
+  ;; (setq zyt/prog-temp-link (string-replace "\n" "" (pp-to-string (bookmark-make-record))))
+  (setq zyt/prog-temp-link (bookmark-make-record))
   nil
   )
 
@@ -56,6 +61,7 @@
 		  :face consult-buffer
 		  :items
 		  ,(lambda()
+			 (let ((display-buffer-overriding-action '((display-buffer-pop-up-frame) nil)))
 			 (consult--buffer-query
 			  :sort 'visibility
 			  ;; :filter 'invert
@@ -78,6 +84,7 @@
 				)
 			  )
 			 )
+			 )
 		  :state ,#'consult--buffer-state)
   )
 
@@ -99,7 +106,7 @@
 ;;    )
 ;;   )
 
-(defun _zyt/prog-store-link()
+(defun _zyt/prog-store-link(&optional label-name)
   "Create temporary link to insert into program-mode files"
   ;; (lt ((selected (consult--multi consult-buffer-sources
   (when-let* (
@@ -114,15 +121,18 @@
 				:prompt "Insert link from buffer: "
 				:history 'consult--buffer-history
 				:sort nil))))
+	
 	(if (get-buffer (car selected))
 		(prog1
 			(with-current-buffer (car selected)
-			  (string-replace "\n" "" (pp-to-string (bookmark-make-record)))
+			  ;; (string-replace "\n" "" (pp-to-string (bookmark-make-record)))
+			  (bookmark-make-record)
 			  )
 		  (pop-to-buffer cur-buf 'display-buffer-same-window)
 		  )
-	  (and (ffap-url-p (car selected))
-		   (car selected))
+	  ;; (and (ffap-url-p (car selected))
+		   ;; (car selected))
+	  (substring-no-properties (car selected))
 	  )
 	)
   )
@@ -159,15 +169,142 @@
 		 ))
 	 ))
   )
-(defun zyt/prog-insert-link()
-  (interactive)
+;; (defsubst fontify--bm-link-line(map &optional bookmark-str)
+(defun fontify--bm-link-line-old(map &optional bookmark-str whole-link-str)
+  ;; (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
+  (set-text-properties
+   (pos-bol) (pos-eol)
+   `(
+	 keymap ,map
+	 mouse-face highlight
+	 help-echo "mouse-2: visit this file in other window"
+	 font-lock-fontified nil
+	 ;; face org-document-title
+	 ;; face tdr-font-mode
+	 face org-link
+	 )
+   )
+  (beginning-of-line)
+  (when-let (
+			 (bookmark-name
+			  (and bookmark-str
+				   (if (consp (car (read-from-string bookmark-str)))
+					   (car (car (read-from-string bookmark-str)))
+					 bookmark-str
+					 )
+				   )
+			  ))
+	;; (re-search-forward bookmark-name (pos-eol) 'noerror)
+	(re-search-forward bookmark-name (pos-eol) 'noerror)
+	(set-text-properties
+	(+ (length comment-start) (pos-bol))
+	 (match-beginning 0)
+	 `(
+	   invisible t
+	   )
+	 )
+	(set-text-properties
+	 (match-beginning 0)
+	 (match-end 0)
+	 `(
+	   face "info-xref"
+	   )
+	 )
+	(set-face-underline zyt/prog-link-face t)
+	(set-text-properties
+	 (match-end 0)
+	 (- (pos-eol) (length comment-end))
+	 `(
+	   invisible t
+	   )
+	 )
+	)
+  )
+;; (defsubst fontify--bm-link-line(map &optional bookmark-str)
+(defun fontify--bm-link-line(map &optional bookmark-str whole-link-str)
+  ;; (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
+  ;; cursor在最后一行行尾是，pos-eol 经常和预期结果不同；稳妥起见，先挪到行首
+  (beginning-of-line)
+  (set-text-properties
+   (pos-bol) (pos-eol)
+   `(
+	 keymap ,map
+	 mouse-face highlight
+	 help-echo "mouse-2: visit this file in other window"
+	 font-lock-fontified nil
+	 ;; face org-document-title
+	 ;; face tdr-font-mode
+	 face org-link
+	 )
+   )
+  (when-let (
+			 ;; (zyt nil)
+			 (bookmark-name
+			  (and bookmark-str
+				   (if (consp (car (read-from-string bookmark-str)))
+					   (car (car (read-from-string bookmark-str)))
+					 bookmark-str
+					 )
+				   )
+			  ))
+	;; (re-search-forward bookmark-name (pos-eol) 'noerror)
+	(re-search-forward whole-link-str (pos-eol) t)
+	(let (
+		  (beginning-0 (match-beginning 0))
+		  (end-0 (match-end 0))
+		  )
+	  (goto-char beginning-0)
+	  (re-search-forward bookmark-str end-0 t)
+	  (set-text-properties
+	   beginning-0
+	   (match-beginning 0)
+	   `(
+		 invisible t
+		 )
+	   )
+	  ;; (set-text-properties
+	  ;;  (match-beginning 0)
+	  ;;  (match-end 0)
+	  ;;  `(
+	  ;; 	 face "info-xref"
+	  ;; 	 )
+	  ;;  )
+	  (set-face-underline zyt/prog-link-face t)
+	  (set-text-properties
+	   (match-end 0)
+	   end-0
+	   `(
+		 invisible t
+		 )
+	   )
+	  )
+	)
+  )
+
+(defun zyt/prog-insert-link(&optional arg)
+  (interactive "P")
   (let* (
 		 (cur-buf (current-buffer))
-		 (bookmark-str (or zyt/prog-temp-link
-						   (_zyt/prog-store-link)
-						   (_zyt/prog-select-link-from-bookmarks)
-						   ))
+		 (bookmark (or zyt/prog-temp-link
+					   (_zyt/prog-store-link arg)
+					   (_zyt/prog-select-link-from-bookmarks)
+					   ))
+		 (bookmark-str
+		  (if (consp bookmark)
+			  (string-replace "\n" "" (pp-to-string bookmark))
+			bookmark
+			)
+		  )
+		 link-name
 		 )
+	(when (and (consp bookmark) arg)
+	  (setq link-name (read-from-minibuffer
+					   "Link Name:"
+					   (if (consp bookmark) (car bookmark) bookmark-str)
+					   )
+			)
+	  (setq bookmark (cons link-name (cdr bookmark)))
+	  )
 	(with-current-buffer cur-buf
 	  (unless (current-line-empty-p)
 		(if (featurep 'evil)
@@ -175,26 +312,46 @@
 		  (end-of-line)
 		  (newline))
 		)
-	  (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
-	  (comment-line 1)
-	  (setq zyt/prog-temp-link nil)
+	  (if link-name
+		  (if (consp bookmark)
+			  (setq bookmark-str (string-replace "\n" "" (pp-to-string bookmark)))
+			)
+		)
+	  (setq whole-link-str (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
+	  ;; (setq whole-link-str (format "[[**(bookmark--jump-via:\"%s\"'switch-to-buffer-other-window)**]]" bookmark-str))
+	  (insert whole-link-str)
+	  ;; C mode 对于长度超过(含) "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 的行做 comment-line后
+	  ;; 如果选中区域进行indent操作，会将 /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx */
+	  ;; 转换成如下形式
+	  ;; /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+	  ;; */
+	  ;; 导致font-lock出错;针对c-mode，change comment style to ~line comments~
+	  (if (derived-mode-p 'c-mode)
+		  (let (
+				;; (c-block-comment-flag-orig c-block-comment-flag)
+				)
+			;; (c-toggle-comment-style -1)
+			(comment-line 1)
+			;; (if c-block-comment-flag-orig
+				;; (c-toggle-comment-style 1)
+				;; )
+			)
+		(comment-line 1)
+		)
 	  ;; [[**  (bookmark-jump "org link font lock")  **]]
-	  (forward-line -1)
+	  ;; 如是最后一行，comment-line 会将cursor折返至当前行行首，而非下一行行首
+	  (unless (= (pos-eol) (buffer-end 1))
+		  (forward-line -1))
 	  (let ((map (make-sparse-keymap)))
 		(define-key map [down-mouse-1] 'zyt/prog-goto-link)
-		(set-text-properties
-		 (pos-bol) (pos-eol)
-		 `(
-		   keymap ,map
-		   mouse-face highlight
-		   help-echo "mouse-2: visit this file in other window"
-		   font-lock-fontified nil
-		   ;; face org-document-title
-		   ;; face tdr-font-mode
-		   face org-link
-		   )
-		 )
+		;; (fontify--bm-link-line map bookmark-str)
+		;; (fontify--bm-link-line map (regexp-quote (substring-no-properties bookmark-str)) (regexp-quote (substring-no-properties whole-link-str)))
+		(if (consp bookmark)
+			(fontify--bm-link-line map (regexp-quote (substring-no-properties (car bookmark))) (regexp-quote (substring-no-properties whole-link-str)))
+		  (fontify--bm-link-line map (regexp-quote (substring-no-properties bookmark)) (regexp-quote (substring-no-properties whole-link-str)))
+		  )
 		)
+	  (setq zyt/prog-temp-link nil)
 	  )
 	)
   nil
@@ -254,6 +411,15 @@
   :lighter " IL"
   :keymap zyt/prog-link-mode-map
   (save-excursion
+	;; evil-indent
+	;; clangd 的对齐建议会导致 lsp-format-region将本模式的长注释截断成为多行
+	;; 导致font-lock无法正常显示，prog-link的解析跳转也会出现问题
+	(with-eval-after-load 'lsp-mode
+	  (when (derived-mode-p 'c-mode)
+		(setq indent-region-function 'c-indent-region)
+		;; lsp-mode 可能在 zyt/prog-link-minor-mode之后启用
+		(add-hook 'lsp-configure-hook 'zyt/prog-link-minor-mode)
+		))
 	(goto-char (point-min))
 	(while (< (point) (point-max))
 	  (goto-char (pos-bol))
@@ -263,21 +429,22 @@
 		   (pos-eol)
 		   t
 		   )
-		(let ((map (make-sparse-keymap))
+		(let* ((map (make-sparse-keymap))
+			  (bookmark-str (match-string 1))
+			  (bookmark (car (read-from-string bookmark-str)))
 			  (modified-flag (buffer-modified-p)))
 		  (define-key map [down-mouse-1] 'zyt/prog-goto-link)
-		  (set-text-properties
-		   (pos-bol) (pos-eol)
-		   `(
-			 keymap ,map
-			 mouse-face highlight
-			 help-echo "mouse-2: visit this file in other window"
-			 font-lock-fontified nil
-			 ;; face org-document-title
-			 ;; face tdr-font-mode
-			 face org-link
-			 )
+		  (font-lock-add-keywords
+		   nil
+		   ;; `((,zyt/prog-link-header-regexp  1 font-lock-doc-face prepend))
+		   `((,zyt/prog-link-header-regexp  1 zyt/prog-link-face t))
 		   )
+		  ;; (fontify--bm-link-line map bookmark-str)
+		  ;; (fontify--bm-link-line map (substring-no-properties (match-string 1)) (substring-no-properties (match-string 0)))
+		  (if (consp bookmark)
+			  (fontify--bm-link-line map (regexp-quote (substring-no-properties  (car bookmark))) (regexp-quote (substring-no-properties (match-string 0))))
+			(fontify--bm-link-line map (regexp-quote (substring-no-properties  bookmark-str)) (regexp-quote (substring-no-properties (match-string 0))))
+			)
 		  (set-buffer-modified-p modified-flag)
 		  )
 		)
