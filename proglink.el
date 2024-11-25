@@ -113,7 +113,7 @@
 ;;    )
 ;;   )
 
-(defun _zyt/prog-store-link(&optional label-name)
+(defun _zyt/prog-store-link()
   "Create temporary link to insert into program-mode files"
   ;; (lt ((selected (consult--multi consult-buffer-sources
   (when-let* (
@@ -230,7 +230,7 @@
 ;; (defsubst fontify--bm-link-line(map &optional bookmark-str)
 (defun fontify--bm-link-line(map &optional bookmark-str whole-link-str)
   ;; (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
-  ;; cursor在最后一行行尾是，pos-eol 经常和预期结果不同；稳妥起见，先挪到行首
+  ;; cursor在最后一行行尾时，pos-eol 经常和预期结果不同；稳妥起见，先挪到行首
   (beginning-of-line)
   (set-text-properties
    (pos-bol) (pos-eol)
@@ -288,12 +288,12 @@
 	)
   )
 
-(defun zyt/prog-insert-link(&optional arg)
+(defun zyt/prog-insert-link(&optional default-label-name)
   (interactive "P")
   (let* (
 		 (cur-buf (current-buffer))
 		 (bookmark (or zyt/prog-temp-link
-					   (_zyt/prog-store-link arg)
+					   (_zyt/prog-store-link)
 					   (_zyt/prog-select-link-from-bookmarks)
 					   ))
 		 (bookmark-str
@@ -304,7 +304,7 @@
 		  )
 		 link-name
 		 )
-	(when (and (consp bookmark) arg)
+	(when (and (consp bookmark) (null default-label-name))
 	  (setq link-name (read-from-minibuffer
 					   "Link Name:"
 					   (if (consp bookmark) (car bookmark) bookmark-str)
@@ -423,7 +423,7 @@
 	;; 导致font-lock无法正常显示，prog-link的解析跳转也会出现问题
 	(with-eval-after-load 'lsp-mode
 	  (when (derived-mode-p 'c-mode)
-		(setq indent-region-function 'c-indent-region)
+		;; (setq indent-region-function 'c-indent-region)
 		;; lsp-mode 可能在 zyt/prog-link-minor-mode之后启用
 		(add-hook 'lsp-configure-hook 'zyt/prog-link-minor-mode)
 		))
