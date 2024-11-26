@@ -22,4 +22,35 @@
   )
 (setq ffap-url-regexp (concat zyt/chm-url-prefix "\\|" ffap-url-regexp))
 (add-to-list 'browse-url-handlers `(,zyt/chm-url-prefix . zyt/chm-browse-url))
+;; devdocs--bookmark-jump
+;; helpful--bookmark-jump
+;; Info-bookmark-jump
+(defun zyt-wrapper (orig bookmark-name-or-record)
+  (condition-case err
+	  (progn
+		(funcall orig bookmark-name-or-record)
+		)
+	(error
+	 (if-let* (
+			   (handler (bookmark-get-handler bookmark-name-or-record))
+			   (handler-name (symbol-name handler))
+			   (handler-feature (intern (nth 0 (split-string handler-name "-"))))
+			   )
+		 (condition-case err
+			 (progn
+			   (require handler-feature)
+			   (funcall orig bookmark-name-or-record)
+			   )
+		   (error
+			(message "The feature, which is assumed to be %s, does not contain %s, please re-check for the correct feature name" (symbol-name handler-feature) handler-name)
+			)
+		   ) 
+	   (signal (car err) (cdr err))
+	   )
+	 )
+	)
+  )
+(advice-add 'bookmark-handle-bookmark
+			:around
+			#'zyt-wrapper)
 (provide 'zyt-ffap-handler)
