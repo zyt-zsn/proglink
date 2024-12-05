@@ -25,6 +25,7 @@
 ;; devdocs--bookmark-jump
 ;; helpful--bookmark-jump
 ;; Info-bookmark-jump
+;; bookmark-w3m-bookmark-jump
 (defun zyt-wrapper (orig bookmark-name-or-record)
   (condition-case err
 	  (progn
@@ -34,7 +35,13 @@
 	 (if-let* (
 			   (handler (bookmark-get-handler bookmark-name-or-record))
 			   (handler-name (symbol-name handler))
-			   (handler-feature (intern (nth 0 (split-string handler-name "-"))))
+			   (handler-feature (intern
+								 ;; (nth 0 (split-string handler-name "-"))
+								 (and
+								  (string-match "\\([^-]*\\)--?bookmark-jump" handler-name)
+								  (match-string 1 handler-name)
+								  )
+								 ))
 			   )
 		 (condition-case err
 			 (progn
