@@ -439,7 +439,11 @@
 		(let* ((map (make-sparse-keymap))
 			  (bookmark-str (match-string 1))
 			  (bookmark (car (read-from-string bookmark-str)))
-			  (modified-flag (buffer-modified-p)))
+			  (modified-flag (buffer-modified-p))
+			  (undo-list buffer-undo-list)
+			  )
+		  ;; [[**  (bookmark--jump-via "("(elisp) Maintaining Undo" (front-context-string . "File: elisp.info") (rear-context-string) (position . 2689922) (last-modified 26454 27114 540208 0) (filename . "d:/Software/Editor/Emacs/emacs-29.4/share/info/elisp") (info-node . "Maintaining Undo") (handler . Info-bookmark-jump) (defaults "(elisp) Maintaining Undo" "elisp" "Maintaining Undo" "*info*"))" 'switch-to-buffer-other-window)  **]]
+		  (buffer-disable-undo)
 		  (define-key map [down-mouse-1] 'zyt/prog-goto-link)
 		  (font-lock-add-keywords
 		   nil
@@ -453,6 +457,8 @@
 			(fontify--bm-link-line map (regexp-quote (substring-no-properties  bookmark-str)) (regexp-quote (substring-no-properties (match-string 0))))
 			)
 		  (set-buffer-modified-p modified-flag)
+		  (buffer-enable-undo)
+		  (setq buffer-undo-list undo-list)
 		  )
 		)
 	  (forward-line)
