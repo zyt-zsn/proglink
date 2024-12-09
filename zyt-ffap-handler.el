@@ -1,6 +1,9 @@
 (require 'ffap)
 (require 'browse-url)
 (require 'eww)
+(require 'bookmark-w3m)
+(require 'cl)
+(require 'pp)
 
 (defconst zyt/chm-url-prefix
   "mk:@MSITStore:"
@@ -20,12 +23,84 @@
 	(w32-shell-execute "open" "KeyHH.exe" (format "-ID-%s %s" (md5 chm-path) chm-url))
 	)
   )
+
+(advice-add 'eww-bookmark-jump
+			:around
+			#'url-bookmark-jump-wrapper
+			)
+(advice-add 'bookmark-w3m-bookmark-jump
+			:around
+			#'url-bookmark-jump-wrapper
+			)
+
+;; (advice-remove
+;;  'bookmark-w3m-bookmark-jump
+;;  ;; 'eww-bookmark-jump
+;;  ;; #'url-bookmark-jump-wrapper
+;;  #'eww-bookmark-jump-wrapper.
+;;  )
+;; (defun eww-bookmark-jump-wrapper (orig bookmark)
+;;   )
+
+(defun url-bookmark-jump-wrapper (orig bookmark)
+  "ZYT:Automatically jump to target pos after browser rendered"
+  ;; (eww (bookmark-prop-get bookmark 'location))
+  (lexical-let* (
+				(cur-buffer (current-buffer))
+				(pos (alist-get 'position (cddr bookmark)))
+				(location (alist-get 'location (cddr bookmark)))
+				(orig-name (pp orig))
+				(browser-name
+				 (progn
+				   (string-match "\\(eww\\|w3m\\)"
+								 orig-name)
+				   (match-string 1 orig-name)
+				   )
+				 )
+				(browser-buffer-name (concat "*" browser-name "*"))
+				)
+	(if (and
+		 pos
+		 (get-buffer browser-buffer-name)
+		 (with-current-buffer (get-buffer browser-buffer-name)
+		   (string= location (eww-current-url))
+		   )
+		 )
+		(progn
+		(pop-to-buffer browser-buffer-name)
+		(with-current-buffer browser-buffer-name
+		  (goto-char pos)
+		  (hl-line-mode)
+		  )
+		(pop-to-buffer cur-buffer)
+		)
+	  (funcall orig bookmark)
+	  (when pos
+		(defun zyt/eww-goto-char ()
+		  (with-current-buffer browser-buffer-name
+			(goto-char pos)
+			(hl-line-mode)
+			(remove-hook 'eww-after-render-hook
+						 #'zyt/eww-goto-char
+						 )
+			)
+		  (pop-to-buffer cur-buffer)
+		  )
+		(add-hook 'eww-after-render-hook
+				  #'zyt/eww-goto-char
+				  )
+		)
+	  )
+	)
+  )
+
 (setq ffap-url-regexp (concat zyt/chm-url-prefix "\\|" ffap-url-regexp))
 (add-to-list 'browse-url-handlers `(,zyt/chm-url-prefix . zyt/chm-browse-url))
 ;; devdocs--bookmark-jump
 ;; helpful--bookmark-jump
 ;; Info-bookmark-jump
 ;; bookmark-w3m-bookmark-jump
+;; eww-bookmark-jump
 (defun zyt-wrapper (orig bookmark-name-or-record)
   (condition-case err
 	  (progn
