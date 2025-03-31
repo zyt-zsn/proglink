@@ -6,11 +6,23 @@
 (require 'ffap)
 (require 'dash)
 (require 'cc-mode)
+(require 'bookmark)
 (require 'zyt-ffap-handler)
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
   )
-(defvar zyt/prog-link-face font-lock-doc-face)
+;; (defvar zyt/prog-link-face font-lock-doc-face)
+(defface zyt/prog-link-face
+  '((t :inherit font-lock-comment-face :underline t))
+  "prog link minor mode face used to indicate link to whatever current text points to"
+  :group 'font-lock-faces)
+
+(defface zyt/prog-hide-face
+  '((t :inherit font-lock-string-face))
+  "prog link minor mode face used to indicate link to whatever current text points to"
+  :group 'font-lock-faces)
+
+(defvar zyt/prog-link-face 'zyt/prog-link-face)
 (defun zyt/prog-link--bookmark-handler(buf)
   (unless (get-buffer-window buf)
 	(display-buffer buf)
@@ -176,62 +188,17 @@
 		 ))
 	 ))
   )
-;; (defsubst fontify--bm-link-line(map &optional bookmark-str)
-(defun fontify--bm-link-line-old(map &optional bookmark-str whole-link-str)
-  ;; (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
-  (set-text-properties
-   (pos-bol) (pos-eol)
-   `(
-	 keymap ,map
-	 mouse-face highlight
-	 help-echo "mouse-2: visit this file in other window"
-	 font-lock-fontified nil
-	 ;; face org-document-title
-	 ;; face tdr-font-mode
-	 face org-link
-	 )
-   )
-  (beginning-of-line)
-  (when-let (
-			 (bookmark-name
-			  (and bookmark-str
-				   (if (consp (car (read-from-string bookmark-str)))
-					   (car (car (read-from-string bookmark-str)))
-					 bookmark-str
-					 )
-				   )
-			  ))
-	;; (re-search-forward bookmark-name (pos-eol) 'noerror)
-	(re-search-forward bookmark-name (pos-eol) 'noerror)
-	(set-text-properties
-	(+ (length comment-start) (pos-bol))
-	 (match-beginning 0)
-	 `(
-	   invisible t
-	   )
-	 )
-	(set-text-properties
-	 (match-beginning 0)
-	 (match-end 0)
-	 `(
-	   face "info-xref"
-	   )
-	 )
-	(set-face-underline zyt/prog-link-face t)
-	(set-text-properties
-	 (match-end 0)
-	 (- (pos-eol) (length comment-end))
-	 `(
-	   invisible t
-	   )
-	 )
-	)
-  )
+
 ;; (defsubst fontify--bm-link-line(map &optional bookmark-str)
 (defun fontify--bm-link-line(map &optional bookmark-str whole-link-str)
+  ;; 正常情况下，插入标签后，调用fontify--bm-link-line即可正常fontify显示
+  ;; 但在buffer尾端插入时，时常不能即时正常显示，暂无时间分析，临时用此笨拙方法规避
+  ;; 考虑效率问题，后应避免使用after-save-hook
+  (add-hook 'after-save-hook 'zyt/prog-link-minor-mode)
   ;; (insert (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
   ;; cursor在最后一行行尾时，pos-eol 经常和预期结果不同；稳妥起见，先挪到行首
   (beginning-of-line)
+  (set-face-underline zyt/prog-link-face t)
   (set-text-properties
    (pos-bol) (pos-eol)
    `(
@@ -241,7 +208,9 @@
 	 font-lock-fontified nil
 	 ;; face org-document-title
 	 ;; face tdr-font-mode
-	 face org-link
+	 ;; face org-link
+	 ;; face ,zyt/prog-link-face
+	 ;; font-lock-face ,zyt/prog-link-face
 	 )
    )
   (when-let (
@@ -255,6 +224,7 @@
 				   )
 			  ))
 	;; (re-search-forward bookmark-name (pos-eol) 'noerror)
+	(goto-char (pos-bol))
 	(re-search-forward whole-link-str (pos-eol) t)
 	(let (
 		  (beginning-0 (match-beginning 0))
@@ -262,6 +232,20 @@
 		  )
 	  (goto-char beginning-0)
 	  (re-search-forward bookmark-str end-0 t)
+	  (set-face-underline zyt/prog-link-face t)
+	  (set-text-properties
+	   ;; (match-beginning 0)
+	   ;; (match-end 0)
+	   ;; (pos-bol)
+	   beginning-0
+	   end-0
+	   `(
+	  ;; 	 ;; face "info-xref"
+	  ;; 	 ;; invisible t
+		 ;; face ,zyt/prog-link-face
+		 ;; font-lock-face ,zyt/prog-link-face
+		 )
+	   )
 	  (set-text-properties
 	   beginning-0
 	   (match-beginning 0)
@@ -269,14 +253,6 @@
 		 invisible t
 		 )
 	   )
-	  ;; (set-text-properties
-	  ;;  (match-beginning 0)
-	  ;;  (match-end 0)
-	  ;;  `(
-	  ;; 	 face "info-xref"
-	  ;; 	 )
-	  ;;  )
-	  (set-face-underline zyt/prog-link-face t)
 	  (set-text-properties
 	   (match-end 0)
 	   end-0
@@ -418,6 +394,7 @@
   :lighter " IL"
   :keymap zyt/prog-link-mode-map
   (save-excursion
+	(bookmark-maybe-load-default-file)
 	;; evil-indent
 	;; clangd 的对齐建议会导致 lsp-format-region将本模式的长注释截断成为多行
 	;; 导致font-lock无法正常显示，prog-link的解析跳转也会出现问题
@@ -425,8 +402,15 @@
 	  (when (derived-mode-p 'c-mode)
 		;; (setq indent-region-function 'c-indent-region)
 		;; lsp-mode 可能在 zyt/prog-link-minor-mode之后启用
-		(add-hook 'lsp-configure-hook 'zyt/prog-link-minor-mode)
-		))
+		(add-hook 'lsp-configure-hook
+				  (lambda()
+					(setq indent-region-function 'c-indent-region)
+					)
+				  ;; 'zyt/prog-link-minor-mode
+				  )
+		)
+	  ;; (add-hook 'after-save-hook 'zyt/prog-link-minor-mode)
+	  )
 	(goto-char (point-min))
 	(while (< (point) (point-max))
 	  (goto-char (pos-bol))
@@ -445,16 +429,25 @@
 		  ;; [[**  (bookmark--jump-via "("(elisp) Maintaining Undo" (front-context-string . "File: elisp.info") (rear-context-string) (position . 2689922) (last-modified 26454 27114 540208 0) (filename . "d:/Software/Editor/Emacs/emacs-29.4/share/info/elisp") (info-node . "Maintaining Undo") (handler . Info-bookmark-jump) (defaults "(elisp) Maintaining Undo" "elisp" "Maintaining Undo" "*info*"))" 'switch-to-buffer-other-window)  **]]
 		  (buffer-disable-undo)
 		  (define-key map [down-mouse-1] 'zyt/prog-goto-link)
-		  (font-lock-add-keywords
-		   nil
-		   ;; `((,zyt/prog-link-header-regexp  1 font-lock-doc-face prepend))
-		   `((,zyt/prog-link-header-regexp  1 zyt/prog-link-face t))
-		   )
-		  ;; (fontify--bm-link-line map bookmark-str)
-		  ;; (fontify--bm-link-line map (substring-no-properties (match-string 1)) (substring-no-properties (match-string 0)))
-		  (if (consp bookmark)
-			  (fontify--bm-link-line map (regexp-quote (substring-no-properties  (car bookmark))) (regexp-quote (substring-no-properties (match-string 0))))
-			(fontify--bm-link-line map (regexp-quote (substring-no-properties  bookmark-str)) (regexp-quote (substring-no-properties (match-string 0))))
+		  (if (null zyt/prog-link-minor-mode)
+			  (progn
+				(font-lock-remove-keywords
+				 nil
+				 ;; `((,zyt/prog-link-header-regexp  (1 font-lock-doc-face prepend)))
+				 `((,zyt/prog-link-header-regexp  1 zyt/prog-link-face t))
+				 )
+				(beginning-of-line)
+				(set-text-properties (pos-bol) (pos-eol) nil)
+				)
+			(font-lock-add-keywords
+			 nil
+			 ;; `((,zyt/prog-link-header-regexp  (1 font-lock-doc-face prepend)))
+			 `((,zyt/prog-link-header-regexp  1 zyt/prog-link-face t))
+			 )
+			(if (consp bookmark)
+				(fontify--bm-link-line map (regexp-quote (substring-no-properties  (car bookmark))) (regexp-quote (substring-no-properties (match-string 0))))
+			  (fontify--bm-link-line map (regexp-quote (substring-no-properties  bookmark-str)) (regexp-quote (substring-no-properties (match-string 0))))
+			  )
 			)
 		  (set-buffer-modified-p modified-flag)
 		  (buffer-enable-undo)
