@@ -1,3 +1,4 @@
+;; -*- coding: chinese-gb18030-dos; -*-
 ;; This buffer is for text that is not saved, and for Lisp evaluation.
 ;; To create a file, visit it with SPC . and enter text in its buffer.
 
@@ -9,7 +10,7 @@
 (require 'bookmark)
 (require 'zyt-ffap-handler)
 (defconst zyt/prog-link-header-regexp
-  "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\]"
+  "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\(.*\\)\\]"
   )
 ;; (defvar zyt/prog-link-face font-lock-doc-face)
 (defface zyt/prog-link-face
@@ -32,27 +33,43 @@
   (interactive)
   (save-excursion
 	(goto-char (pos-bol))
-	(when
+	(if
 		(re-search-forward
 		 zyt/prog-link-header-regexp
 		 (pos-eol)
 		 t
 		 )
-	  (let ((bookmark-str (match-string 1))
-			(display-buffer-overriding-action
-			 '(display-buffer-use-least-recent-window)
-			 )
+		(let ((bookmark-str (match-string 1))
+			  (display-buffer-overriding-action
+			   '(display-buffer-use-least-recent-window)
+			   )
+			  (ret 'found)
+			  )
+		  (if (consp (car (read-from-string bookmark-str)))
+			  (bookmark--jump-via (car (read-from-string bookmark-str)) 'zyt/prog-link--bookmark-handler)
+			(if (bookmark-get-bookmark bookmark-str t)
+				(bookmark--jump-via bookmark-str 'zyt/prog-link--bookmark-handler)
+			  (find-file-at-point bookmark-str)
+			  (setq ret nil)
+			  )
 			)
-		(if (consp (car (read-from-string bookmark-str)))
-			(bookmark--jump-via (car (read-from-string bookmark-str)) 'zyt/prog-link--bookmark-handler)
-		  (if (bookmark-get-bookmark bookmark-str t)
-			  (bookmark--jump-via bookmark-str 'zyt/prog-link--bookmark-handler)
-			(find-file-at-point bookmark-str)
-			)
+		  ret
 		  )
+	  (if (eq major-mode 'org-mode)
+		  (org-open-at-point)
 		)
 	  )
 	)
+  )
+(with-eval-after-load 'org
+  (advice-add 'org-open-at-point
+			  :before-until
+			  #'zyt/prog-goto-link
+			  )
+  (advice-add 'org-src-font-lock-fontify-block
+			  :after
+			  #'zyt/prog-link-font-lock-fontify-block
+			  )
   )
 ;; https://emacs.stackexchange.com/questions/16792/easiest-way-to-check-if-current-line-is-empty-ignoring-whitespace
 ;; [[**  (bookmark--jump-via "("(dir) Top" (front-context-string . "Dired-Preview: (") (rear-context-string . " Menu:\n\nEmacs\n* ") (position . 551) (last-modified 26426 63699 715916 0) (filename . "dir") (info-node . "Top") (handler . Info-bookmark-jump) (defaults "(dir) Top" "dir" "Top" "*info*"))" 'switch-to-buffer-other-window)  **]]
@@ -107,25 +124,7 @@
 		  :state ,#'consult--buffer-state)
   )
 
-;; (defun zyt()
-;;   (consult--buffer-query
-;;    :sort 'visibility
-;;    ;; :filter 'invert
-;;    :as #'consult--buffer-pair
-;;    :buffer-list (--keep (window-buffer it) (window-list))
-;;    ;; :buffer-list (buffer-list)
-;;    :predicate
-;;    (lambda(buf)
-;; 	 (with-current-buffer buf
-;; 	   t
-;; 	   ;; (null (window-minibuffer-p (get-buffer-window)))
-;; 	   ;; (window-minibuffer-p (get-buffer-window))
-;; 	   )
-;; 	 )
-;;    )
-;;   )
-
-(defun _zyt/prog-store-link()
+(defun _zyt/prog-select-link-from-displayed-buffers()
   "Create temporary link to insert into program-mode files"
   ;; (lt ((selected (consult--multi consult-buffer-sources
   (when-let* (
@@ -189,6 +188,10 @@
 	 ))
   )
 
+(with-eval-after-load 'org
+  (setq org-highlight-latex-and-related
+		  (remove 'entities org-highlight-latex-and-related))
+  )
 ;; (defsubst fontify--bm-link-line(map &optional bookmark-str)
 (defun fontify--bm-link-line(map &optional bookmark-str whole-link-str)
   ;; 正常情况下，插入标签后，调用fontify--bm-link-line即可正常fontify显示
@@ -199,20 +202,7 @@
   ;; cursor在最后一行行尾时，pos-eol 经常和预期结果不同；稳妥起见，先挪到行首
   (beginning-of-line)
   (set-face-underline zyt/prog-link-face t)
-  (set-text-properties
-   (pos-bol) (pos-eol)
-   `(
-	 keymap ,map
-	 mouse-face highlight
-	 help-echo "mouse-2: visit this file in other window"
-	 font-lock-fontified nil
-	 ;; face org-document-title
-	 ;; face tdr-font-mode
-	 ;; face org-link
-	 ;; face ,zyt/prog-link-face
-	 ;; font-lock-face ,zyt/prog-link-face
-	 )
-   )
+  ;; [[**  (bookmark--jump-via "("org.el add text properties" (filename . "~/.emacs.d/straight/repos/org/lisp/org.el") (front-context-string . "e-property (pcas") (rear-context-string . "            (fac") (position . 212381) (last-modified 26602 13963 284016 0) (defaults "org.el"))" 'switch-to-buffer-other-window)  **]]
   (when-let (
 			 ;; (zyt nil)
 			 (bookmark-name
@@ -232,34 +222,10 @@
 		  )
 	  (goto-char beginning-0)
 	  (re-search-forward bookmark-str end-0 t)
-	  (set-face-underline zyt/prog-link-face t)
-	  (set-text-properties
-	   ;; (match-beginning 0)
-	   ;; (match-end 0)
-	   ;; (pos-bol)
-	   beginning-0
-	   end-0
-	   `(
-	  ;; 	 ;; face "info-xref"
-	  ;; 	 ;; invisible t
-		 ;; face ,zyt/prog-link-face
-		 ;; font-lock-face ,zyt/prog-link-face
-		 )
-	   )
-	  (set-text-properties
-	   beginning-0
-	   (match-beginning 0)
-	   `(
-		 invisible t
-		 )
-	   )
-	  (set-text-properties
-	   (match-end 0)
-	   end-0
-	   `(
-		 invisible t
-		 )
-	   )
+	  ;; (set-face-underline zyt/prog-link-face t)
+	  (set-text-properties beginning-0 end-0 nil)
+	  (set-text-properties beginning-0 (match-beginning 0) `(invisible t))
+	  (set-text-properties (match-end 0) end-0 `(invisible t))
 	  )
 	)
   )
@@ -269,7 +235,7 @@
   (let* (
 		 (cur-buf (current-buffer))
 		 (bookmark (or zyt/prog-temp-link
-					   (_zyt/prog-store-link)
+					   (_zyt/prog-select-link-from-displayed-buffers)
 					   (_zyt/prog-select-link-from-bookmarks)
 					   ))
 		 (bookmark-str
@@ -278,14 +244,11 @@
 			bookmark
 			)
 		  )
-		 link-name
+		 (link-name
+		  (read-from-minibuffer "Link Name:"
+								(or default-label-name (if (consp bookmark) (car bookmark) bookmark-str))))
 		 )
-	(when (and (consp bookmark) (null default-label-name))
-	  (setq link-name (read-from-minibuffer
-					   "Link Name:"
-					   (if (consp bookmark) (car bookmark) bookmark-str)
-					   )
-			)
+	(when (consp bookmark)
 	  (setq bookmark (cons link-name (cdr bookmark)))
 	  )
 	(with-current-buffer cur-buf
@@ -295,13 +258,10 @@
 		  (end-of-line)
 		  (newline))
 		)
-	  (if link-name
-		  (if (consp bookmark)
-			  (setq bookmark-str (string-replace "\n" "" (pp-to-string bookmark)))
-			)
+	  (if (eq major-mode 'org-mode)
+		  (setq whole-link-str (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **][%s]]" bookmark-str link-name))
+		(setq whole-link-str (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
 		)
-	  (setq whole-link-str (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
-	  ;; (setq whole-link-str (format "[[**(bookmark--jump-via:\"%s\"'switch-to-buffer-other-window)**]]" bookmark-str))
 	  (insert whole-link-str)
 	  ;; C mode 对于长度超过(含) "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 的行做 comment-line后
 	  ;; 如果选中区域进行indent操作，会将 /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx */
@@ -319,7 +279,9 @@
 				;; (c-toggle-comment-style 1)
 				;; )
 			)
-		(comment-line 1)
+		(unless (eq major-mode 'org-mode)
+		  (comment-line 1)
+		  )
 		)
 	  ;; [[**  (bookmark-jump "org link font lock")  **]]
 	  ;; 如是最后一行，comment-line 会将cursor折返至当前行行首，而非下一行行首
@@ -351,68 +313,15 @@
 ;; c-mode-base-map 默认将 ~C-c C-l~绑定在了 ~c-toggle-electric-state~
 (define-key c-mode-base-map (kbd "C-c C-l") #'zyt/prog-insert-link)
 
-;; (defun zyt()
-;;   (interactive)
-;;   ;; (let ((bookmark-name
-;;   ;; (ido-completing-read
-;;   (ivy-read
-;;    "插入标签: "
-;;    (--map 
-;; 	(substring-no-properties (bookmark-name-from-full-record it))
-;; 	(bookmark-maybe-sort-alist))
-;;    :action
-;;    #'action
-;;    ;; (lambda(bookmark)
-;;    ;; 	(bookmark--jump-via bookmark 'switch-to-buffer-other-window)
-;;    ;; 	)
-;;    :update-fn
-;;    (lambda ()
-;; 	 (let ((cur-buf(current-buffer)))
-;; 	   (progn
-;; 		 (save-excursion
-;; 		   (bookmark--jump-via  (ivy-state-current ivy-last) 'switch-to-buffer-other-window)
-;; 		   (pop-to-buffer cur-buf '(display-buffer-in-previous-window . ()) t)
-;; 		   )
-;; 		 (message (format "content of bookmark %s" (ivy-state-current ivy-last)))
-;; 		 )
-;; 	   )
-;; 	 )))
-;; (message (format "Hello %s\n" bookmark-name))
-;; (bookmark--jump-via bookmark-name 'switch-to-buffer-other-window)
-;; )))
-
 (defvar zyt/prog-link-mode-map
   (let ((map (make-sparse-keymap)))
 	(define-key map (kbd "C-c C-l") #'zyt/prog-insert-link)
 	(define-key map (kbd "C-c C-o") #'zyt/prog-goto-link)
 	map))
 
-;;;###autoload
-(define-minor-mode zyt/prog-link-minor-mode
-  "在编程模式下添加文档连接"
-  :init-value nil
-  :lighter " IL"
-  :keymap zyt/prog-link-mode-map
-  (save-excursion
-	(bookmark-maybe-load-default-file)
-	;; evil-indent
-	;; clangd 的对齐建议会导致 lsp-format-region将本模式的长注释截断成为多行
-	;; 导致font-lock无法正常显示，prog-link的解析跳转也会出现问题
-	(with-eval-after-load 'lsp-mode
-	  (when (derived-mode-p 'c-mode)
-		;; (setq indent-region-function 'c-indent-region)
-		;; lsp-mode 可能在 zyt/prog-link-minor-mode之后启用
-		(add-hook 'lsp-configure-hook
-				  (lambda()
-					(setq indent-region-function 'c-indent-region)
-					)
-				  ;; 'zyt/prog-link-minor-mode
-				  )
-		)
-	  ;; (add-hook 'after-save-hook 'zyt/prog-link-minor-mode)
-	  )
-	(goto-char (point-min))
-	(while (< (point) (point-max))
+(defun zyt/prog-link-font-lock-fontify-block (lang start end)
+	(goto-char start)
+	(while (< (point) end)
 	  (goto-char (pos-bol))
 	  (when
 		  (re-search-forward
@@ -456,11 +365,36 @@
 		)
 	  (forward-line)
 	  )
-	))
+  )
+
+;;;###autoload
+(define-minor-mode zyt/prog-link-minor-mode
+  "在编程模式下添加文档连接"
+  :init-value nil
+  :lighter " IL"
+  :keymap zyt/prog-link-mode-map
+  (save-excursion
+	(bookmark-maybe-load-default-file)
+	;; evil-indent
+	;; clangd 的对齐建议会导致 lsp-format-region将本模式的长注释截断成为多行
+	;; 导致font-lock无法正常显示，prog-link的解析跳转也会出现问题
+	(with-eval-after-load 'lsp-mode
+	  (when (derived-mode-p 'c-mode)
+		;; (setq indent-region-function 'c-indent-region)
+		;; lsp-mode 可能在 zyt/prog-link-minor-mode之后启用
+		(add-hook 'lsp-configure-hook
+				  (lambda()
+					(setq indent-region-function 'c-indent-region)
+					)
+				  ;; 'zyt/prog-link-minor-mode
+				  )
+		)
+	  ;; (add-hook 'after-save-hook 'zyt/prog-link-minor-mode)
+	  )
+	(zyt/prog-link-font-lock-fontify-block nil (point-min) (point-max))
+	)
+  )
 (provide 'proglink)
-
-
-;; [[**  (bookmark--jump-via "usb_20.pdf" 'switch-to-buffer-other-window)  **]]
 
 ;; Local Variables:
 ;; coding: chinese-gb18030-dos
