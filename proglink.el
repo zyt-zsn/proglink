@@ -9,6 +9,7 @@
 (require 'cc-mode)
 (require 'bookmark)
 (require 'zyt-ffap-handler)
+(require 'evil-common)
 (defconst zyt/prog-link-header-regexp
   "\\[\\[\\*\\*  \(bookmark--jump-via \"\\(.*\\)\" 'switch-to-buffer-other-window)  \\*\\*\\]\\(.*\\)\\]"
   )
@@ -234,19 +235,19 @@
 					   (_zyt/prog-select-link-from-displayed-buffers)
 					   (_zyt/prog-select-link-from-bookmarks)
 					   ))
-		 (bookmark-str
-		  (if (consp bookmark)
-			  (string-replace "\n" "" (pp-to-string bookmark))
-			bookmark
-			)
-		  )
 		 (link-name
 		  (read-from-minibuffer "Link Name:"
 								(or default-label-name (if (consp bookmark) (car bookmark) bookmark-str))))
+		 (bookmark-str	;;bookmark's serialization representation
+		  (if (consp bookmark)
+			  (progn
+				(setq bookmark (cons link-name (cdr bookmark)))
+			  (string-replace "\n" "" (pp-to-string bookmark))
+			  )
+			bookmark
+			)
+		  )
 		 )
-	(when (consp bookmark)
-	  (setq bookmark (cons link-name (cdr bookmark)))
-	  )
 	(with-current-buffer cur-buf
 	  (unless (current-line-empty-p)
 		(if (featurep 'evil)
@@ -259,29 +260,63 @@
 		(setq whole-link-str (format "[[**  (bookmark--jump-via \"%s\" 'switch-to-buffer-other-window)  **]]" bookmark-str))
 		)
 	  (insert whole-link-str)
-	  ;; C mode 对于长度超过(含) "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 的行做 comment-line后
-	  ;; 如果选中区域进行indent操作，会将 /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx */
-	  ;; 转换成如下形式
-	  ;; /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-	  ;; */
-	  ;; 导致font-lock出错;针对c-mode，change comment style to ~line comments~
-	  (if (derived-mode-p 'c-mode)
-		  (let (
-				;; (c-block-comment-flag-orig c-block-comment-flag)
-				)
-			;; (c-toggle-comment-style -1)
-			(comment-line 1)
-			;; (if c-block-comment-flag-orig
-				;; (c-toggle-comment-style 1)
-				;; )
-			)
-		(unless (eq major-mode 'org-mode)
+	  (cond
+	   ((derived-mode-p 'c-mode)
+		;; C mode 对于长度超过(含) "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 的行做 comment-line后
+		;; 如果选中区域进行indent操作，会将 /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx */
+		;; 转换成如下形式
+		;; /* xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+		;; */
+		;; 导致font-lock出错;针对c-mode，change comment style to ~line comments~
+		;; ZYT: 上述描述在新版本代码中不再成立? 不需要再针对c-mode特殊处理?
+		(let (
+			  ;; (c-block-comment-flag-orig c-block-comment-flag)
+			  )
+		  ;; (c-toggle-comment-style -1)
 		  (comment-line 1)
+		  ;; (if c-block-comment-flag-orig
+		  ;; (c-toggle-comment-style 1)
+		  ;; )
 		  )
 		)
+	   ((eq major-mode 'org-mode)
+		(if (org-in-src-block-p 'inside)
+			(let* (
+				   (element (org-element-at-point-no-context))
+				   ;; (begin (org-element-property :begin element))
+				   ;; (end (org-element-property :end element))
+				   (src-block-mode (org-src-get-lang-mode (nth 0 (org-babel-get-src-block-info))))
+				   (pos (point))
+				   )
+			  ;; (evil-with-active-region begin end
+			  (evil-with-active-region (pos-bol) (pos-eol)
+				  (funcall src-block-mode)
+				  (zyt/prog-link-minor-mode -1)
+				  (comment-line 1)
+				  (setq pos (point))
+				  (zyt/prog-link-minor-mode 1)
+				  ;; (let ((org-startup-with-latex-preview))
+				  ;; (funcall-interactively 'org-mode)
+				  (org-mode)
+				  (org-indent-line)
+				  ;; )
+				)
+			  (goto-char pos)
+			  )
+		  )
+		;;todo: zyt comment according to src block's language
+		)
+	   (t
+		(comment-line 1)
+		)
+	   )
 	  ;; [[**  (bookmark-jump "org link font lock")  **]]
 	  ;; 如是最后一行，comment-line 会将cursor折返至当前行行首，而非下一行行首
-	  (unless (= (pos-eol) (buffer-end 1))
+	  (unless (or
+			   (= (pos-eol) (buffer-end 1))
+			   ;; org-mode: 或未做comment(out of src block)或对cusor做了调整(inside src block)
+			   (eq major-mode 'org-mode)
+			   )
 		  (forward-line -1))
 	  (let ((map (make-sparse-keymap)))
 		(define-key map [down-mouse-1] 'zyt/prog-goto-link)
