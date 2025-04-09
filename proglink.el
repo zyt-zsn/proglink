@@ -62,10 +62,6 @@
 	)
   )
 (with-eval-after-load 'org
-  (advice-add 'org-open-at-point
-			  :before-until
-			  #'zyt/prog-goto-link
-			  )
   (advice-add 'org-src-font-lock-fontify-block
 			  :after
 			  #'zyt/prog-link-font-lock-fontify-block
