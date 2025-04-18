@@ -32,33 +32,33 @@
   )
 (defun zyt/prog-goto-link()
   (interactive)
-  (save-excursion
-	(goto-char (pos-bol))
-	(if
+  (if
+	  (save-excursion
+		(goto-char (pos-bol))
 		(re-search-forward
 		 zyt/prog-link-header-regexp
 		 (pos-eol)
 		 t
 		 )
-		(let ((bookmark-str (match-string 1))
-			  (display-buffer-overriding-action
-			   '(display-buffer-use-least-recent-window)
-			   )
-			  (ret 'found)
-			  )
-		  (if (consp (car (read-from-string bookmark-str)))
-			  (bookmark--jump-via (car (read-from-string bookmark-str)) 'zyt/prog-link--bookmark-handler)
-			(if (bookmark-get-bookmark bookmark-str t)
-				(bookmark--jump-via bookmark-str 'zyt/prog-link--bookmark-handler)
-			  (find-file-at-point bookmark-str)
-			  (setq ret nil)
-			  )
-			)
-		  ret
-		  )
-	  (if (eq major-mode 'org-mode)
-		  (org-open-at-point)
 		)
+	  (let ((bookmark-str (match-string 1))
+			(display-buffer-overriding-action
+			 '(display-buffer-use-least-recent-window)
+			 )
+			(ret 'found)
+			)
+		(if (consp (car (read-from-string bookmark-str)))
+			(bookmark--jump-via (car (read-from-string bookmark-str)) 'zyt/prog-link--bookmark-handler)
+		  (if (bookmark-get-bookmark bookmark-str t)
+			  (bookmark--jump-via bookmark-str 'zyt/prog-link--bookmark-handler)
+			(find-file-at-point bookmark-str)
+			(setq ret nil)
+			)
+		  )
+		ret
+		)
+	(if (eq major-mode 'org-mode)
+		(org-open-at-point)
 	  )
 	)
   )
