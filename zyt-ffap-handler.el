@@ -49,7 +49,7 @@
 				(cur-buffer (current-buffer))
 				(pos (alist-get 'position (cddr bookmark)))
 				(location (alist-get 'location (cddr bookmark)))
-				(orig-name (pp orig))
+				(orig-name (or (pp orig) (subr-name orig)))
 				(browser-name
 				 (progn
 				   (string-match "\\(eww\\|w3m\\)"
