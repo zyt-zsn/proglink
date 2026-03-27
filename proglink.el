@@ -27,7 +27,19 @@
 (defvar zyt/prog-link-face 'zyt/prog-link-face)
 (defun zyt/prog-link--bookmark-handler(buf)
   (unless (get-buffer-window buf)
-	(display-buffer buf)
+	;; emacs 31 的 bookmark.el为了解决(bug#75354) 调整了 bookmark--jump-via(https://github.com/emacs-mirror/emacs/commit/78f5ea750a25145086c008991db6dd6f6dd2a466)
+	;; 新版本 [[**  (bookmark--jump-via "("bookmark--jump-via" (filename . "/usr/local/share/emacs/31.0.50/lisp/bookmark.el.gz") (front-context-string . "un bookmark--jum") (rear-context-string . "e-mode'.\")\n\n(def") (position . 52333) (last-modified 27078 40770 122115 354000) (defaults "bookmark.el.gz"))" 'switch-to-buffer-other-window)  **]]
+	;; 	   将 (bookmark-handle-bookmark bookmark-name-or-record)的执行包在了 save-window-excursion 中
+	;; 	   导致bookmark-handle-bookmark后会恢复 current-buffer为bookmark所在buffer(而非 emacs 30版本中的 bookmark target buffer)
+	;; 	   接着调用 (funcall display-function buf), display-function(也即本函数)如仍调用 display-buffer(Display BUFFER-OR-NAME in some window, without selecting it.) 而不是 pop-to-buffer(Display buffer specified by BUFFER-OR-NAME and select its window.) 
+	;; 	   后面再执行 bookmark-after-jump-hook(bookmark为pdf文件时，对应于 pdf-view-bookmark-jump-handler 设定的  (show-fn-sym (make-symbol "pdf-view-bookmark-after-jump-hook"))))
+	;; 	   执行 (pdf-view-mode)时的 current-buffer 不是target-buffer, 而是bookmark所在的buffer,导致执行失败
+	;; 进行如下针对性调整,以确保(pdf-view-mode)正常
+	;; 副作用：proglink 中的 pdf 连接体验和其他类型连接(比如eww连接)有一定差异：会将光标切换到 target buffer而非留在当前buffer
+	(if (with-current-buffer buf (eq major-mode 'pdf-view-mode))
+		(pop-to-buffer buf)
+	  (display-buffer buf)
+	  )
 	)
   )
 (defun zyt/prog-goto-link()
