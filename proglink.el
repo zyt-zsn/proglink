@@ -1,4 +1,4 @@
-;; -*- coding: utf-8-unix; -*-
+;; -*- coding: utf-8-unix; lexical-binding: t; -*-
 ;; This buffer is for text that is not saved, and for Lisp evaluation.
 ;; To create a file, visit it with SPC . and enter text in its buffer.
 

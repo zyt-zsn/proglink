@@ -1,3 +1,4 @@
+;;; ...  -*- lexical-binding: t -*-
 (require 'ffap)
 (require 'browse-url)
 (require 'eww)
