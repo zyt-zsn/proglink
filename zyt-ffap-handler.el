@@ -119,13 +119,14 @@
 								  )
 								 ))
 			   )
-		 (condition-case err
+		 (condition-case new-err
 			 (progn
 			   (require handler-feature)
 			   (funcall orig bookmark-name-or-record)
 			   )
 		   (error
-			(message "The feature, which is assumed to be %s, does not contain %s, please re-check for the correct feature name" (symbol-name handler-feature) handler-name)
+			;; orig err 信息更加明确
+			(message "%s %s\n or The feature, which is assumed to be %s, does not contain %s, please re-check for the correct feature name" (car err) (cdr err) (symbol-name handler-feature) handler-name)
 			)
 		   ) 
 	   (signal (car err) (cdr err))
