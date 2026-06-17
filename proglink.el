@@ -212,7 +212,7 @@
   (beginning-of-line)
   (set-face-underline zyt/prog-link-face t)
   ;; [[**  (bookmark--jump-via "("org.el add text properties" (filename . "~/.emacs.d/straight/repos/org/lisp/org.el") (front-context-string . "e-property (pcas") (rear-context-string . "            (fac") (position . 212381) (last-modified 26602 13963 284016 0) (defaults "org.el"))" 'switch-to-buffer-other-window)  **]]
-  (when-let (
+  (when-let* (
 			 ;; (zyt nil)
 			 (bookmark-name
 			  (and bookmark-str
